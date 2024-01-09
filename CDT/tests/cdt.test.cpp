@@ -782,3 +782,172 @@ TEST_CASE("Don't flip constraint edge when resolving intersection", "")
         REQUIRE(topologyString(cdt) == topologyString(outFile));
     }
 }
+
+TEST_CASE(
+    "Regression: resolving edges intersection with a hanging edge in a "
+    "pseudo-polygon",
+    "")
+{
+    const auto inputFile = std::string("HangingIntersection.txt");
+    const auto order = VertexInsertionOrder::Auto;
+    const auto intersectingEdgesStrategy =
+        IntersectingConstraintEdges::TryResolve;
+    const auto minDistToConstraintEdge = 1e-6;
+    const auto outFile = "expected/" +
+                         inputFile.substr(0, inputFile.size() - 4) + "__f64_" +
+                         to_string(order) + "_" +
+                         to_string(intersectingEdgesStrategy) + "_all.txt";
+
+    const auto [vv, ee] = readInputFromFile<double>("inputs/" + inputFile);
+    auto cdt = Triangulation<double>(
+        order, intersectingEdgesStrategy, minDistToConstraintEdge);
+    cdt.insertVertices(vv);
+    cdt.insertEdges(ee);
+    REQUIRE(CDT::verifyTopology(cdt));
+
+    if(updateFiles)
+        topologyToFile(outFile, cdt);
+    else
+    {
+        REQUIRE(topologyString(cdt) == topologyString(outFile));
+    }
+}
+
+TEST_CASE("Regression: multiple hanging edges", "")
+{
+    const auto inputFile = std::string("HangingIntersection.txt");
+    const auto order = VertexInsertionOrder::Auto;
+    const auto intersectingEdgesStrategy =
+        IntersectingConstraintEdges::TryResolve;
+    const auto minDistToConstraintEdge = 1e-6;
+    const auto outFile = "expected/" +
+                         inputFile.substr(0, inputFile.size() - 4) + "__f64_" +
+                         to_string(order) + "_" +
+                         to_string(intersectingEdgesStrategy) + "_all.txt";
+
+    const auto [vv, ee] = readInputFromFile<double>("inputs/" + inputFile);
+    auto cdt = Triangulation<double>(
+        order, intersectingEdgesStrategy, minDistToConstraintEdge);
+    cdt.insertVertices(vv);
+    cdt.insertEdges(ee);
+    REQUIRE(CDT::verifyTopology(cdt));
+
+    if(updateFiles)
+        topologyToFile(outFile, cdt);
+    else
+    {
+        REQUIRE(topologyString(cdt) == topologyString(outFile));
+    }
+}
+
+TEST_CASE("Regression test", "")
+{
+    const auto inputFile = std::string("debug2.txt");
+    const auto [vv, ee] = readInputFromFile<double>("inputs/" + inputFile);
+    auto cdt = Triangulation<double>(VertexInsertionOrder::Auto);
+    cdt.insertVertices(vv);
+    cdt.insertEdges(ee);
+    REQUIRE(CDT::verifyTopology(cdt));
+}
+
+TEST_CASE("Regression test issue #154 (1)", "")
+{
+    // Very large coordinate values lead to wrong super-triangle coordinates due
+    // to the floating-point rounding
+    auto cdt = Triangulation<double>{};
+    cdt.insertVertices({
+        {0.0, 1e38},
+        {1.0, 1e38},
+    });
+    REQUIRE(CDT::verifyTopology(cdt));
+    const auto outFile = "expected/154_1.txt";
+    if(updateFiles)
+        topologyToFile(outFile, cdt);
+    else
+    {
+        REQUIRE(topologyString(cdt) == topologyString(outFile));
+    }
+}
+
+TEST_CASE("Regression test issue #154 (2)", "")
+{
+    // Explanation: There was an incorrect assumptions that there are no 'loops'
+    // in the pseudo-polygons, only 'hanging' edges. The loops are possible as
+    // shown by this test case.
+    auto cdt = Triangulation<double>{};
+    cdt.insertVertices({
+        {2.0, -2.18933983E-5},
+        {-0.0896810815, -2.18407786E-5},
+        {-2.19008489E-5, -7.64692231E-6},
+        {8.73939061E-5, 0.00568488613},
+        {-0.00142463227, -0.00142461748},
+        {-7.67273832E-6, 8.7602064E-5},
+        {0.00569847599, -0.00142463227},
+        {-2.18156383E-5, -7.6295637E-6},
+    });
+    REQUIRE(CDT::verifyTopology(cdt));
+    cdt.insertEdges({
+        {0, 1},
+    });
+    REQUIRE(CDT::verifyTopology(cdt));
+    const auto outFile = "expected/154_2.txt";
+    if(updateFiles)
+        topologyToFile(outFile, cdt);
+    else
+    {
+        REQUIRE(topologyString(cdt) == topologyString(outFile));
+    }
+}
+
+TEST_CASE("Regression test issue #154 (3)", "")
+{
+    // Explanation: There was an incorrect assumptions that there are no 'loops'
+    // in the pseudo-polygons, only 'hanging' edges. The loops are possible as
+    // shown by this test case.
+    auto cdt = Triangulation<double>{};
+    cdt.insertVertices({
+        {-2.0, 1.47656155},
+        {-6.40527344, -40.4999084},
+        {0.0, -7.96960115},
+        {-2.00152564, 1.46877956},
+        {-2.70361328, -7.99999619},
+        {-2.70465064, -7.99901962},
+        {-7.97778273, -19.3754253},
+        {7.96885204, -5.37488127},
+        {-7.97180128, -39.7499695},
+    });
+    cdt.insertEdges({
+        {0, 8},
+    });
+    REQUIRE(CDT::verifyTopology(cdt));
+    const auto outFile = "expected/154_3.txt";
+    if(updateFiles)
+        topologyToFile(outFile, cdt);
+    else
+    {
+        REQUIRE(topologyString(cdt) == topologyString(outFile));
+    }
+}
+
+TEST_CASE("Regression test: hanging edge in pseudo-poly", "")
+{
+    auto [vv, ee] = readInputFromFile<double>("inputs/hanging3.txt");
+    auto cdt = Triangulation<double>{};
+    cdt.insertVertices(vv);
+    cdt.insertEdges(ee);
+    REQUIRE(CDT::verifyTopology(cdt));
+}
+
+TEST_CASE("Regression test #174: super-triangle of tiny bounding box", "")
+{
+    auto cdt = Triangulation<double>{};
+    const auto vv = Vertices<double>{
+        {{45802.2779561576462583616375923, 169208.540894783218391239643097},
+         {45802.2779561576317064464092255, 169208.540894783218391239643097},
+         {45802.2779561576462583616375923, 169208.540894783247495070099831}},
+    };
+    REQUIRE_NOTHROW(cdt.insertVertices(vv));
+    REQUIRE(CDT::verifyTopology(cdt));
+    cdt.eraseSuperTriangle();
+    REQUIRE(cdt.triangles.size() == std::size_t(1));
+}

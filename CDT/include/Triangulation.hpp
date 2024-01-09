@@ -1020,10 +1020,24 @@ void Triangulation<T, TNearPointLocator>::addSuperTriangle(const Box2d<T>& box)
         (box.min.x + box.max.x) / T(2), (box.min.y + box.max.y) / T(2)};
     const T w = box.max.x - box.min.x;
     const T h = box.max.y - box.min.y;
-    T r = std::sqrt(w * w + h * h) / T(2); // incircle radius
-    r *= T(1.1);
-    const T R = T(2) * r;                        // excircle radius
-    const T shiftX = R * std::sqrt(T(3)) / T(2); // R * cos(30 deg)
+    T r = std::max(w, h); // incircle radius upper bound
+
+    // Note: make sure radius is big enough. Constants chosen experimentally.
+    // - for tiny bounding boxes: use 1.0 as the smallest radius
+    // - multiply radius by 2.0 for extra safety margin
+    r = std::max(T(2) * r, T(1));
+
+    // Note: for very large floating point numbers rounding can lead to wrong
+    // super-triangle coordinates. This is a very rare corner-case so the
+    // handling is very primitive.
+    { // note: '<=' means '==' but avoids the warning
+        while(center.y <= center.y - r)
+            r *= T(2);
+    }
+
+    const T R = T(2) * r;                    // excircle radius
+    const T cos_30_deg = 0.8660254037844386; // note: (std::sqrt(3.0) / 2.0)
+    const T shiftX = R * cos_30_deg;
     const V2d<T> posV1 = {center.x - shiftX, center.y - r};
     const V2d<T> posV2 = {center.x + shiftX, center.y - r};
     const V2d<T> posV3 = {center.x, center.y + R};
@@ -1291,15 +1305,59 @@ template <typename T, typename TNearPointLocator>
 bool Triangulation<T, TNearPointLocator>::isRefinementNeeded(
     const Triangle& tri,
     const RefinementCriterion::Enum refinementCriterion,
-    const T refinementThreshold) const
+    const T refinementThreshold,
+    const VertInd steinerVerticesOffset) const
 {
     const V2d<T>& a = vertices[tri.vertices[0]];
     const V2d<T>& b = vertices[tri.vertices[1]];
     const V2d<T>& c = vertices[tri.vertices[2]];
     switch(refinementCriterion)
     {
-    case RefinementCriterion::SmallestAngle:
-        return smallestAngle(a, b, c) < refinementThreshold;
+    case RefinementCriterion::SmallestAngle: {
+        VertInd aIdx = tri.vertices[0];
+        VertInd bIdx = tri.vertices[1];
+        VertInd cIdx = tri.vertices[2];
+        T sideA = distance(a, b), sideB = distance(b, c);
+        if(sideA > sideB)
+        {
+            aIdx = tri.vertices[1];
+            bIdx = tri.vertices[2];
+            cIdx = tri.vertices[0];
+            std::swap(sideA, sideB);
+        }
+        if(sideA > distance(a, c))
+        {
+            aIdx = tri.vertices[0];
+            bIdx = tri.vertices[2];
+            cIdx = tri.vertices[1];
+        }
+        else
+        {
+            sideA = distance(a, c);
+        }
+        T angle = (doubledArea(a, b, c) / sideA) / sideB;
+
+        bool isBad = angle < refinementThreshold;
+        if(isBad)
+        {
+            if(aIdx >= steinerVerticesOffset && bIdx >= steinerVerticesOffset)
+            {
+                TriInd iT, iTopo;
+                std::tie(iT, iTopo) = edgeTriangles(aIdx, bIdx);
+                VertInd v = opposedVertex(triangles[iT], iTopo);
+                if(v == cIdx)
+                    v = opposedVertex(triangles[iTopo], iT);
+                float dist1 = distance(vertices[v], vertices[aIdx]);
+                float dist2 = distance(vertices[v], vertices[bIdx]);
+                if((dist1 < 1.01 * dist2) || (dist1 > 0.99 * dist2))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
     case RefinementCriterion::LargestArea:
         return area(a, b, c) > refinementThreshold;
     }
@@ -1387,8 +1445,11 @@ TriIndVec Triangulation<T, TNearPointLocator>::resolveEncroachedEdges(
         do
         {
             const Triangle& t = triangles[currTri];
-            if(circumcenterOrNull &&
-               isRefinementNeeded(t, refinementCriterion, badTriangleThreshold))
+            if(circumcenterOrNull && isRefinementNeeded(
+                                         t,
+                                         refinementCriterion,
+                                         badTriangleThreshold,
+                                         steinerVerticesOffset))
             {
                 badTriangles.push_back(currTri);
             }
@@ -2334,7 +2395,11 @@ void Triangulation<T, TNearPointLocator>::refineTriangles(
 
         const Triangle& t = triangles[iT];
 
-        if(isRefinementNeeded(t, refinementCriterion, refinementThreshold))
+        if(isRefinementNeeded(
+               t,
+               refinementCriterion,
+               refinementThreshold,
+               steinerVerticesOffset))
         {
             const V2d<T> vert = circumcenter(
                 vertices[t.vertices[0]],
@@ -2354,7 +2419,11 @@ void Triangulation<T, TNearPointLocator>::refineTriangles(
         TriInd iT = badTriangles.front();
         const Triangle& t = triangles[iT];
         badTriangles.pop();
-        if(!isRefinementNeeded(t, refinementCriterion, refinementThreshold) ||
+        if(!isRefinementNeeded(
+               t,
+               refinementCriterion,
+               refinementThreshold,
+               steinerVerticesOffset) ||
            remainingVertexBudget == 0)
         {
             continue;
@@ -2363,7 +2432,8 @@ void Triangulation<T, TNearPointLocator>::refineTriangles(
             vertices[t.vertices[0]],
             vertices[t.vertices[1]],
             vertices[t.vertices[2]]);
-
+        assert(std::isfinite(vert.x));
+        assert(std::isfinite(vert.y));
         if(locatePointTriangle(vert, vertices[0], vertices[1], vertices[2]) ==
            PtTriLocation::Outside)
         {
@@ -2414,7 +2484,10 @@ void Triangulation<T, TNearPointLocator>::refineTriangles(
             {
                 const Triangle& t = triangles[currTri];
                 if(isRefinementNeeded(
-                       t, refinementCriterion, refinementThreshold))
+                       t,
+                       refinementCriterion,
+                       refinementThreshold,
+                       steinerVerticesOffset))
                 {
                     badTriangles.push(currTri);
                 }
