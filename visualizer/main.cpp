@@ -540,22 +540,22 @@ public:
             SLOT(buildCDT(QListWidgetItem*)));
 
         QSpinBox* ptsSpinbox = new QSpinBox;
-        ptsSpinbox->setRange(0, 999999);
+        ptsSpinbox->setRange(0, 9999999);
         connect(
             ptsSpinbox,
             SIGNAL(valueChanged(int)),
             m_cdtWidget,
             SLOT(setPointsLimit(int)));
-        ptsSpinbox->setValue(999999);
+        ptsSpinbox->setValue(9999999);
 
         QSpinBox* edgesSpinbox = new QSpinBox;
-        edgesSpinbox->setRange(0, 999999);
+        edgesSpinbox->setRange(0, 9999999);
         connect(
             edgesSpinbox,
             SIGNAL(valueChanged(int)),
             m_cdtWidget,
             SLOT(setEdgeLimit(int)));
-        edgesSpinbox->setValue(999999);
+        edgesSpinbox->setValue(9999999);
 
         QSpinBox* steinerPtsSpinbox = new QSpinBox;
         steinerPtsSpinbox->setRange(0, 999999);
