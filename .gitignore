@@ -84,3 +84,8 @@ moc_*.h
 # Visual code files
 *.code-workspace
 *.vscode
+
+# GNU global
+GPATH
+GRTAGS
+GTAGS
