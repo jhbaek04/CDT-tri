@@ -294,8 +294,8 @@ public:
     /**
      * Traingles refinement by removing bad triangles
      * @note bad triangles don't fulfill constraints defined by the user
-     * @param refinement_constrain refinement strategy that is used to identify
-     * bad triangles
+     * @param refinementCriterion refinement strategy that is used to identify
+     *        bad triangles
      * @param refinementThreshold threshold value for refinement
      */
     void refineTriangles(
