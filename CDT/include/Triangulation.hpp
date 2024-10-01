@@ -1335,9 +1335,9 @@ bool Triangulation<T, TNearPointLocator>::isRefinementNeeded(
         {
             sideA = distance(a, c);
         }
-        T angle = (doubledArea(a, b, c) / sideA) / sideB;
+        T sine_angle = (doubledArea(a, b, c) / sideA) / sideB;
 
-        bool isBad = angle < refinementThreshold;
+        bool isBad = sine_angle < std::sin( refinementThreshold );
         if(isBad)
         {
             if(aIdx >= steinerVerticesOffset && bIdx >= steinerVerticesOffset)
