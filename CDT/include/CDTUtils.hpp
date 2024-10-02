@@ -322,7 +322,8 @@ bool isEncroachingOnEdge(
 template <typename T>
 V2d<T> circumcenter(V2d<T> a, V2d<T> b, const V2d<T>& c)
 {
-    const T denom = 0.5 / orient2D(c, a, b);
+    const T denom_tol = 1e-20; // to avoid dividing by zero
+    const T denom = 0.5 / (orient2D(c, a, b) + denom_tol);
     a.x -= c.x, a.y -= c.y;
     b.x -= c.x, b.y -= c.y;
     const T aLenSq = lengthSquared(a), bLenSq = lengthSquared(b);
